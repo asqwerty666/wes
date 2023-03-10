@@ -1,5 +1,5 @@
 # WES
-=======
+
 Parallel processing in python for the whole exome sequencing pipeline
 
 ![Individual WES pipeline](wes_hg38.png)
