@@ -1,6 +1,4 @@
 # WES
-<<<<<<< HEAD
-parallel processing in python for the whole exome sequencing pipeline
 =======
 Parallel processing in python for the whole exome sequencing pipeline
 
@@ -16,11 +14,10 @@ There is two main python files in the bin directory.
 You can edit and execute the wes.py script but for simplicity I have divided into two diferent scripts,
 
    * preproc.py : Manage all individual pipelines and build the individual VCFs 
-   * vcf\_proc.py : Combines individual VCF files into a single VCF woth all info
+   * vcf\_proc.py : Combines individual VCF files into a single VCF with all info
 
 ## TO DO
 
    * Docs!
 
 
->>>>>>> ae0c293 (Fixing commit)
