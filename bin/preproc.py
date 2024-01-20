@@ -175,14 +175,14 @@ for pollo in dir_cont:
         cdata['job_name'] = pollo + '_MarkDuplicates'
         cdata['filename'] = outdir + '/' + pollo + '_MarkDuplicates.sh'
         cdata['output'] = outdir + '/' + pollo + '_MarkDuplicates.out'
-        cdata['command'] = gatk +  ' MarkDuplicates -I ' + tmpdir + '/' + pollo + '_sorted.bam -O ' + resdir + '/' + pollo + '_rmdups.bam --METRICS_FILE ' + resdir + '/' + pollo + '_metrics.txt --QUIET TRUE --MAX_RECORDS_IN_RAM 2000000 --ASSUME_SORTED TRUE --CREATE_INDEX TRUE'
+        cdata['command'] = gatk +  ' MarkDuplicates -I ' + tmpdir + '/' + pollo + '_sorted.bam -O ' + tmpdir + '/' + pollo + '_rmdups.bam --METRICS_FILE ' + resdir + '/' + pollo + '_metrics.txt --QUIET TRUE --MAX_RECORDS_IN_RAM 2000000 --ASSUME_SORTED TRUE --CREATE_INDEX TRUE'
         cdata['dependency'] = 'afterok:' + str(p)
         p = send_sbatch(cdata)
         # CollectHsMetrics para sacar un report
         #cdata['job_name'] = pollo + '_CollectHsMetrics_1'
         #cdata['filename'] = outdir + '/' + pollo + '_CollectHsMetrics_1.sh'
         #cdata['output'] = outdir + '/' + pollo + '_CollectHsMetrics_1.out'
-        #cdata['command'] = gatk + ' CollectHsMetrics -BI ' + baits + ' -TI ' + targets + ' -I ' + resdir + '/' + pollo + '_rmdups.bam -O ' + resdir + '/' + pollo + '_hsmetrics.txt'
+        #cdata['command'] = gatk + ' CollectHsMetrics -BI ' + baits + ' -TI ' + targets + ' -I ' + tmpdir + '/' + pollo + '_rmdups.bam -O ' + resdir + '/' + pollo + '_hsmetrics.txt'
         #cdata['dependency'] = 'afterok:' + str(p)
         #p0 = send_sbatch(cdata)
         #ljobids.append(p0)
@@ -191,14 +191,14 @@ for pollo in dir_cont:
         cdata['job_name'] = pollo + '_BaseRecalibrator_1'
         cdata['filename'] = outdir + '/' + pollo + '_BaseRecalibrator_1.sh'
         cdata['output'] = outdir + '/' + pollo + '_BaseRecalibrator_1.out'
-        cdata['command'] = gatk + ' BaseRecalibrator -I ' + resdir + '/' + pollo + '_rmdups.bam -R ' + ref_fa +' --known-sites ' + ref_dir + '/'+known1+' --known-sites '+ ref_dir + '/'+known2+' --known-sites ' + ref_dir + '/'+dbsnp+' -O ' + resdir + '/' + pollo + '_recal_data.table1'
+        cdata['command'] = gatk + ' BaseRecalibrator -I ' + tmpdir + '/' + pollo + '_rmdups.bam -R ' + ref_fa +' --known-sites ' + ref_dir + '/'+known1+' --known-sites '+ ref_dir + '/'+known2+' --known-sites ' + ref_dir + '/'+dbsnp+' -O ' + resdir + '/' + pollo + '_recal_data.table1'
         cdata['dependency'] = 'afterok:' + str(p)
         p = send_sbatch(cdata)
         # ApplyBQSR, depende de BaseRecalibrator
         cdata['job_name'] = pollo + '_ApplyBQSR'
         cdata['filename'] = outdir + '/' + pollo + '_ApplyBQSR.sh'
         cdata['output'] = outdir + '/' + pollo + '_ApplyBQSR.out'
-        cdata['command'] = gatk + ' ApplyBQSR -R ' + ref_fa+' -I ' + resdir + '/' + pollo + '_rmdups.bam -bqsr-recal-file ' + resdir + '/' + pollo + '_recal_data.table1 -O ' + resdir + '/' + pollo + '_recal.bam'
+        cdata['command'] = gatk + ' ApplyBQSR -R ' + ref_fa+' -I ' + tmpdir + '/' + pollo + '_rmdups.bam -bqsr-recal-file ' + resdir + '/' + pollo + '_recal_data.table1 -O ' + resdir + '/' + pollo + '_recal.bam'
         cdata['dependency'] = 'afterok:' + str(p)
         p0 = send_sbatch(cdata)
         # AnalyzeCovariates, depende de BaseRecalibrator
