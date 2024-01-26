@@ -2,7 +2,7 @@
 
 Parallel processing in python for the whole exome sequencing pipeline
 
-![Individual WES pipeline](wes_hg38.png)
+![Individual WES pipeline](wes_pipe.png)
 
 ## Python progs
 
@@ -49,10 +49,10 @@ So far is all ready to run the WES.
 
 ## Just go
 
-Once you have everything in place, you probably want to edit the data paths inside the _wes.py_ script.After everything is OK just do,
+Once you have everything in place, you probably want to edit the data paths inside the _preproc.py_ script.After everything is OK just do,
 
 ```
-bin/wes.py
+bin/preproc.py
 ```
 
 and you can go to surf a couple of days while the script send the jobs to the schedule manager, collects result and so on. Eventually you will get an email with some warning about tasks finishing.
@@ -65,11 +65,8 @@ The script has also some basic optional input options for do some testing in you
    * --output, -o : especify where to storage the output
    * --source, -s : especify where to look for subject's fasta files
 
-### Alternative way
+This command will run individual analysis. After that you will want to compile the whole DB, but only after checking everyting is finei. You could use the script,
 
-If you want to run individual analysis first and compile the whole DB only after checking everyting is fine you could use the scripts,
-
-  * *preproc.py* : run individual analysis
   * *vcf_proc.py* : make full GVCF from individual files
 
 
