@@ -228,8 +228,8 @@ for pollo in dir_cont:
         cdata['job_name'] = pollo + '_CollectWGSMetrics'
         cdata['filename'] = outdir + '/' + pollo + '_CollectWGSMetrics.sh'
         cdata['output'] = outdir + '/' + pollo + '_CollectWGSMetrics.out'
-        cdata['command'] = gatk + ' CollectRawWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_raw_wgs_metrics.txt  -R ' + ref_fa + '\n'
-        cdata['command'] += gatk + ' CollectWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_wgs_metrics.txt  -R ' + ref_fa
+        #cdata['command'] = gatk + ' CollectRawWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_raw_wgs_metrics.txt  -R ' + ref_fa + '\n'
+        cdata['command'] += gatk + ' CollectWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_wgs_metrics.txt  -R ' + ref_fa + ' --COUNT_UNPAIRED true -Q 0 -MQ 0'
         #cdata['command'] = gatk + ' CollectHsMetrics -BI '+baits + ' -TI ' + targets + ' -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_recal_hsmetrics.txt'
         cdata['dependency'] = 'afterok:' + str(p0)
         p1 = send_sbatch(cdata)
