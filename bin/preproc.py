@@ -31,15 +31,17 @@ See:
 """
 Data PATHS
 """
-src_dir = '/ruby/Traspaso-datos-11-2022/fqdata'
-ref_dir = '/ruby/WES_reference/hg38'
+src_dir = '/nas/Genomica/01-Data/02-WXS/01-Raw.data/202211_WES_PSP-DEGESCO/fqdata/'
+ref_dir = '/nas/Genomica/01-Data/00-Reference_files/02-GRCh38/00_Bundle/'
+panel_dir = '/nas/Genomica/01-Data/00-Reference_files/02-GRCh38/202211_KAPA_WES_PSP-DEGESCO/'
 ref_name = 'Homo_sapiens_assembly38'
 ref_fa = ref_dir+'/'+ref_name+'.fasta'
 output_dir = '/ruby/WES_output'
 tmp_dir = '/ruby/user_data/'+os.environ.get('USER')+'/tmp/'
-baits = ref_dir + '/KAPA_HyperExome_hg38_bait.interval_list'
-targets = ref_dir + '/KAPA_HyperExome_hg38_target.interval_list'
-unions = ref_dir + '/KAPA_HyperExome_hg38_union.interval_list' 
+baits = panel_dir + '/KAPA_HyperExome_hg38_bait.interval_list'
+targets = panel_dir + '/KAPA_HyperExome_hg38_target.interval_list'
+unions = panel_dir + '/KAPA_HyperExome_hg38_union.interval_list' 
+union_bed = panel_dir + 'KAPA_HyperExome_hg38_capture_primary_targets_union.bed'
 known1 = 'Homo_sapiens_assembly38.known_indels.vcf.gz'
 known2 = 'Mills_and_1000G_gold_standard.indels.hg38.vcf.gz'
 dbsnp = 'Homo_sapiens_assembly38.dbsnp138.vcf'
@@ -50,6 +52,7 @@ Executable PATHS
 fastqc = '/nas/usr/local/bin/fastqc'
 bwa = '/nas/usr/local/bin/bwa mem -t 4 -M'
 picard = 'java -Djava.io.tmpdir='+tmp_dir+' -Xmx8g -jar /nas/usr/local/bin/picard.jar'
+bedtools = '/nas/software/bedtools2/bin/bedtools'
 samtools = '/nas/software/samtools/bin/samtools'
 verifyBamID = '/nas/usr/local/bin/verifyBamID'
 freemix = 'singularity run --cleanenv -B /nas:/nas -B /ruby:/ruby -B /the_dysk:/the_dysk /nas/usr/local/opt/singularity/freemix.simg VerifyBamID --SVDPrefix /scripts/1000g.phase3.10k.b38.exome.vcf.gz.dat --NumThread 8 --max-depth 1000 --DisableSanityCheck'
@@ -131,38 +134,30 @@ for pollo in dir_cont:
         p = send_sbatch(cdata)
         ljobids.append(p)
         
-        for fq in range(2): #Esta es la logica que hay que cambiar cada vez que nos cambian la estructura de los datos
-                gsconv += ' -I ' + tmpdir + '/' + pollo + '_' + str(fq+1) + '.sam'
+        #for fq in range(2): #Esta es la logica que hay que cambiar cada vez que nos cambian la estructura de los datos
+        #        gsconv += ' -I ' + tmpdir + '/' + pollo + '_' + str(fq+1) + '.sam'
                 # Now, bwa for each fq.gz
-                cdata['filename'] = outdir + '/' + pollo + '_bwa_' + str(fq) + '.sh'
-                cdata['job_name'] = pollo + '_bwa_' + str(fq)
-                cdata['output'] = outdir + '/' + pollo + '_bwa_' + str(fq) + '.out'
-                cdata['command'] = bwa + ' -R "@RG\\tID:1\\tDS:KAPA_TE\\tPL:ILLUMINA\\tLB:'+pollo+'\\tSM:'+pollo+'" ' + ref_fa+' ' + lpath + '/' + pollo + '/' + pollo + '_'+ str(fq+1) + '.fq.gz > '+ tmpdir + '/' + pollo + '_' + str(fq+1) + '.sam'
-                p = send_sbatch(cdata)
-                fjobids.append(p)
+        cdata['filename'] = outdir + '/' + pollo + '_CreateSam.sh'
+        cdata['job_name'] = pollo + '_CreateSam'
+        cdata['output'] = outdir + '/' + pollo + '_CreateSam.out'
+        cdata['command'] = bwa + ' -R "@RG\\tID:1\\tDS:KAPA_TE\\tPL:ILLUMINA\\tLB:'+pollo+'\\tSM:'+pollo+'" ' + ref_fa+' ' + lpath + '/' + pollo + '/' + pollo + '_1.fq.gz ' +  lpath + '/' + pollo + '/' + pollo + '_2.fq.gz | ' + gatk + ' SortSam -I /dev/stdin -O '+ tmpdir + '/' + pollo + '_sorted.bam --SORT_ORDER coordinate --CREATE_INDEX true\n'
+        cdata['command'] += bedtools + ' intersect -u -a ' + tmpdir + '/' + pollo + '_sorted.bam -b ' +union_bed + ' > ' + tmpdir + '/' + pollo + '_isec.bam'
+        p = send_sbatch(cdata)
+        #        fjobids.append(p)
         
         # Next batch, MergeSamFiles +  SortSam + index
-        deps = ',afterok:'.join(map(str, fjobids))
-        fjobids = []
-        cdata['job_name'] = pollo + '_MergeSortIndex'
-        cdata['filename'] = outdir + '/' + pollo + '_MergeSortIndex.sh'
-        cdata['output'] = outdir + '/' + pollo + '_MergeSortIndex.out'
-        cdata['command'] = 'export TMPDIR='+tmp_shit+'/$SLURM_JOBID\n'
-        cdata['command'] += gatk + ' MergeSamFiles' + gsconv + ' -O ' + tmpdir + '/' + pollo + '.sam\n'
-        cdata['command'] += gatk + ' SortSam -I ' + tmpdir + '/' + pollo + '.sam -O ' + tmpdir + '/' + pollo + '_sorted.bam --SORT_ORDER coordinate\n'
-        cdata['command'] += samtools + ' index ' + tmpdir + '/' + pollo + '_sorted.bam'
-        cdata['dependency'] = 'afterok:' + deps
-        p = send_sbatch(cdata)
+        #deps = ',afterok:'.join(map(str, fjobids))
+        #fjobids = []
+        #cdata['job_name'] = pollo + '_MergeSortIndex'
+        #cdata['filename'] = outdir + '/' + pollo + '_MergeSortIndex.sh'
+        #cdata['output'] = outdir + '/' + pollo + '_MergeSortIndex.out'
+        #cdata['command'] = 'export TMPDIR='+tmp_shit+'/$SLURM_JOBID\n'
+        #cdata['command'] += gatk + ' MergeSamFiles' + gsconv + ' -O ' + tmpdir + '/' + pollo + '.sam\n'
+        #cdata['command'] += gatk + ' SortSam -I ' + tmpdir + '/' + pollo + '.sam -O ' + tmpdir + '/' + pollo + '_sorted.bam --SORT_ORDER coordinate\n'
+        #cdata['command'] += samtools + ' index ' + tmpdir + '/' + pollo + '_sorted.bam'
+        #cdata['dependency'] = 'afterok:' + deps
+        #p = send_sbatch(cdata)
         #print(cdata)
-        # VerifyBamID for the sorted bam file
-        cdata['job_name'] = pollo + '_verifybamid'
-        cdata['filename'] = outdir + '/' + pollo + '_verifybamid.sh'
-        cdata['output'] = outdir + '/' + pollo + '_verifybamid.out'
-        #cdata['command'] = verifyBamID + ' --vcf ' + ref_dir + '/hapmap_3.3.hg38.vcf.gz --bam ' + tmpdir + '/' + pollo + '_sorted.bam --chip-none --maxDepth 1000 --precise --verbose --ignoreRG --out ' + resdir + '/' + pollo + '_verifybam |& grep -v "Skipping marker"'
-        cdata['command'] = freemix + ' --BamFile '  + tmpdir + '/' + pollo + '_sorted.bam --Reference ' + ref_fa + ' --Output ' + resdir + '/' + pollo + '.vbid2'
-        cdata['dependency'] = 'afterok:' + str(p)
-        p0 = send_sbatch(cdata)
-        ljobids.append(p0)
         # ValidateSamFile
         #cdata['job_name'] = pollo + '_Validate'
         #cdata['filename'] = outdir + '/' + pollo + '_Validate.sh'
@@ -175,7 +170,7 @@ for pollo in dir_cont:
         cdata['job_name'] = pollo + '_MarkDuplicates'
         cdata['filename'] = outdir + '/' + pollo + '_MarkDuplicates.sh'
         cdata['output'] = outdir + '/' + pollo + '_MarkDuplicates.out'
-        cdata['command'] = gatk +  ' MarkDuplicates -I ' + tmpdir + '/' + pollo + '_sorted.bam -O ' + tmpdir + '/' + pollo + '_rmdups.bam --METRICS_FILE ' + resdir + '/' + pollo + '_metrics.txt --QUIET TRUE --MAX_RECORDS_IN_RAM 2000000 --ASSUME_SORTED TRUE --CREATE_INDEX TRUE'
+        cdata['command'] = gatk +  ' MarkDuplicates -I ' + tmpdir + '/' + pollo + '_isec.bam -O ' + tmpdir + '/' + pollo + '_rmdups.bam --METRICS_FILE ' + resdir + '/' + pollo + '_metrics.txt --QUIET TRUE --MAX_RECORDS_IN_RAM 2000000 --ASSUME_SORTED TRUE --CREATE_INDEX TRUE'
         cdata['dependency'] = 'afterok:' + str(p)
         p = send_sbatch(cdata)
         # CollectHsMetrics para sacar un report
@@ -186,59 +181,86 @@ for pollo in dir_cont:
         #cdata['dependency'] = 'afterok:' + str(p)
         #p0 = send_sbatch(cdata)
         #ljobids.append(p0)
+
+        # VerifyBamID for the sorted bam file
+        cdata['job_name'] = pollo + '_verifybamid'
+        cdata['filename'] = outdir + '/' + pollo + '_verifybamid.sh'
+        cdata['output'] = outdir + '/' + pollo + '_verifybamid.out'
+        #cdata['command'] = verifyBamID + ' --vcf ' + ref_dir + '/hapmap_3.3.hg38.vcf.gz --bam ' + tmpdir + '/' + pollo + '_sorted.bam --chip-none --maxDepth 1000 --precise --verbose --ignoreRG --out ' + resdir + '/' + pollo + '_verifybam |& grep -v "Skipping marker"'
+        cdata['command'] = freemix + ' --BamFile '  + tmpdir + '/' + pollo + '_rmdups.bam --Reference ' + ref_fa + ' --Output ' + resdir + '/' + pollo + '.vbid2'
+        cdata['dependency'] = 'afterok:' + str(p)
+        p0 = send_sbatch(cdata)
+        ljobids.append(p0)
+
         # Vamos a GATK4, BaseRecalibrator, ApplyBQSR, AnalyzeCovariates, BaseRecalibrator, AnalyzeCovariates, HaplotypeCaller
         # BaseRecalibrator
-        cdata['job_name'] = pollo + '_BaseRecalibrator_1'
-        cdata['filename'] = outdir + '/' + pollo + '_BaseRecalibrator_1.sh'
-        cdata['output'] = outdir + '/' + pollo + '_BaseRecalibrator_1.out'
-        cdata['command'] = gatk + ' BaseRecalibrator -I ' + tmpdir + '/' + pollo + '_rmdups.bam -R ' + ref_fa +' --known-sites ' + ref_dir + '/'+known1+' --known-sites '+ ref_dir + '/'+known2+' --known-sites ' + ref_dir + '/'+dbsnp+' -O ' + resdir + '/' + pollo + '_recal_data.table1'
+        cdata['job_name'] = pollo + '_BaseRecalibrator'
+        cdata['filename'] = outdir + '/' + pollo + '_BaseRecalibrator.sh'
+        cdata['output'] = outdir + '/' + pollo + '_BaseRecalibrator.out'
+        cdata['command'] = gatk + ' BaseRecalibrator -I ' + tmpdir + '/' + pollo + '_rmdups.bam -R ' + ref_fa + ' -L ' + unions + ' --known-sites ' + ref_dir + '/'+known1+' --known-sites '+ ref_dir + '/'+known2+' --known-sites ' + ref_dir + '/'+dbsnp+' -O ' + resdir + '/' + pollo + '_recal_data.table'
         cdata['dependency'] = 'afterok:' + str(p)
         p = send_sbatch(cdata)
         # ApplyBQSR, depende de BaseRecalibrator
         cdata['job_name'] = pollo + '_ApplyBQSR'
         cdata['filename'] = outdir + '/' + pollo + '_ApplyBQSR.sh'
         cdata['output'] = outdir + '/' + pollo + '_ApplyBQSR.out'
-        cdata['command'] = gatk + ' ApplyBQSR -R ' + ref_fa+' -I ' + tmpdir + '/' + pollo + '_rmdups.bam -bqsr-recal-file ' + resdir + '/' + pollo + '_recal_data.table1 -O ' + resdir + '/' + pollo + '_recal.bam'
+        cdata['command'] = gatk + ' ApplyBQSR -R ' + ref_fa+' -I ' + tmpdir + '/' + pollo + '_rmdups.bam -L ' + unions +' -bqsr-recal-file ' + resdir + '/' + pollo + '_recal_data.table -O ' + resdir + '/' + pollo + '_recal.bam'
         cdata['dependency'] = 'afterok:' + str(p)
         p0 = send_sbatch(cdata)
         # AnalyzeCovariates, depende de BaseRecalibrator
-        cdata['job_name'] = pollo + '_AnalyzeCovariates_1'
-        cdata['filename'] = outdir + '/' + pollo + '_AnalyzeCovariates_1.sh'
-        cdata['output'] = outdir + '/' + pollo + '_AnalyzeCovariates_1.out'
-        cdata['command'] = gatk + ' AnalyzeCovariates -bqsr ' + resdir + '/' + pollo + '_recal_data.table1 --plots ' + resdir + '/' + pollo + '_AnalyzeCovariates.pdf'
+        cdata['job_name'] = pollo + '_AnalyzeCovariates'
+        cdata['filename'] = outdir + '/' + pollo + '_AnalyzeCovariates.sh'
+        cdata['output'] = outdir + '/' + pollo + '_AnalyzeCovariates.out'
+        cdata['command'] = gatk + ' AnalyzeCovariates -bqsr ' + resdir + '/' + pollo + '_recal_data.table --plots ' + resdir + '/' + pollo + '_AnalyzeCovariates.pdf'
         cdata['dependency'] = 'afterok:' + str(p)
         p1 = send_sbatch(cdata)
         ljobids.append(p1)
         # BaseRecalibrator 2, depende de BaseRecalibrator
-        cdata['job_name'] = pollo + '_BaseRecalibrator_2'
-        cdata['filename'] = outdir + '/' + pollo + '_BaseRecalibrator_2.sh'
-        cdata['output'] = outdir + '/' + pollo + '_BaseRecalibrator_2.out'
-        cdata['command'] = gatk + ' BaseRecalibrator -I '+ resdir + '/' + pollo + '_recal.bam -R '+ ref_fa+' --known-sites ' + ref_dir + '/'+known1+' --known-sites '+ ref_dir + '/'+known2+' --known-sites ' + ref_dir + '/'+dbsnp+' -O ' + resdir + '/' + pollo + '_recal_data.table2'
-        cdata['dependency'] = 'afterok:' + str(p0)
-        p1 = send_sbatch(cdata)
+        #cdata['job_name'] = pollo + '_BaseRecalibrator_2'
+        #cdata['filename'] = outdir + '/' + pollo + '_BaseRecalibrator_2.sh'
+        #cdata['output'] = outdir + '/' + pollo + '_BaseRecalibrator_2.out'
+        #cdata['command'] = gatk + ' BaseRecalibrator -I '+ resdir + '/' + pollo + '_recal.bam -R '+ ref_fa+' --known-sites ' + ref_dir + '/'+known1+' --known-sites '+ ref_dir + '/'+known2+' --known-sites ' + ref_dir + '/'+dbsnp+' -O ' + resdir + '/' + pollo + '_recal_data.table2'
+        #cdata['dependency'] = 'afterok:' + str(p0)
+        #p1 = send_sbatch(cdata)
         # AnalyzeCovariates 2, depende de BaseRecalibrator 2
-        cdata['job_name'] = pollo + '_AnalyzeCovariates_2'
-        cdata['filename'] = outdir + '/' + pollo + '_AnalyzeCovariates_2.sh'
-        cdata['output'] = outdir + '/' + pollo + '_AnalyzeCovariates_2.out'
-        cdata['command'] = gatk + ' AnalyzeCovariates -before '+  resdir + '/' + pollo + '_recal_data.table1 -after '+  resdir + '/' + pollo + '_recal_data.table2 -plots '+  resdir + '/' + pollo +'_before-after-plots.pdf'
-        cdata['dependency'] = 'afterok:' + str(p1)
-        p1 = send_sbatch(cdata)
-        ljobids.append(p1)
+        #cdata['job_name'] = pollo + '_AnalyzeCovariates_2'
+        #cdata['filename'] = outdir + '/' + pollo + '_AnalyzeCovariates_2.sh'
+        #cdata['output'] = outdir + '/' + pollo + '_AnalyzeCovariates_2.out'
+        #cdata['command'] = gatk + ' AnalyzeCovariates -before '+  resdir + '/' + pollo + '_recal_data.table1 -after '+  resdir + '/' + pollo + '_recal_data.table2 -plots '+  resdir + '/' + pollo +'_before-after-plots.pdf'
+        #cdata['dependency'] = 'afterok:' + str(p1)
+        #p1 = send_sbatch(cdata)
+        #ljobids.append(p1)
         # CollectWGSMetrics, depende de ApplyBQSR
-        cdata['job_name'] = pollo + '_CollectWGSMetrics'
-        cdata['filename'] = outdir + '/' + pollo + '_CollectWGSMetrics.sh'
-        cdata['output'] = outdir + '/' + pollo + '_CollectWGSMetrics.out'
-        #cdata['command'] = gatk + ' CollectRawWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_raw_wgs_metrics.txt  -R ' + ref_fa + '\n'
-        cdata['command'] += gatk + ' CollectWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_wgs_metrics.txt  -R ' + ref_fa + ' --COUNT_UNPAIRED true -Q 0 -MQ 0'
-        #cdata['command'] = gatk + ' CollectHsMetrics -BI '+baits + ' -TI ' + targets + ' -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_recal_hsmetrics.txt'
+        cdata['cpus'] = 4
+        cdata['job_name'] = pollo + '_CollectRawMetrics'
+        cdata['filename'] = outdir + '/' + pollo + '_CollectRawMetrics.sh'
+        cdata['output'] = outdir + '/' + pollo + '_CollectRawMetrics.out'
+        #cdata['command'] = gatk + ' CollectRawWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_raw_wgs_metrics.txt  -R ' + ref_fa + ' -L ' + unions + '--COUNT_UNPAIRED true \n'
+        #cdata['command'] += gatk + ' CollectWgsMetrics -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_wgs_metrics.txt  -R ' + ref_fa + ' -L ' + unions + ' --COUNT_UNPAIRED true\n'
+        cdata['command'] = gatk + ' DepthOfCoverage -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_raw_wgs_metrics.txt  -R ' + ref_fa + ' -L ' + unions + ' --summary-coverage-threshold 10 --summary-coverage-threshold 15 --summary-coverage-threshold 20 --summary-coverage-threshold 30 --summary-coverage-threshold 40 --summary-coverage-threshold 50 --summary-coverage-threshold 60 --summary-coverage-threshold 70 --summary-coverage-threshold 80 --summary-coverage-threshold 90 --summary-coverage-threshold 100 --omit-depth-output-at-each-base true --omit-interval-statistics true --omit-locus-table true'
         cdata['dependency'] = 'afterok:' + str(p0)
         p1 = send_sbatch(cdata)
         ljobids.append(p1)
+        cdata['job_name'] = pollo + '_CollectWgsMetrics'
+        cdata['filename'] = outdir + '/' + pollo + '_CollectWgsMetrics.sh'
+        cdata['output'] = outdir + '/' + pollo + '_CollectWgsMetrics.out'
+        cdata['command'] = gatk + ' DepthOfCoverage -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_wgs_metrics.txt  -R ' + ref_fa + ' -L ' + unions + ' --summary-coverage-threshold 10 --summary-coverage-threshold 15 --summary-coverage-threshold 20 --summary-coverage-threshold 30 --summary-coverage-threshold 40 --summary-coverage-threshold 50 --summary-coverage-threshold 60 --summary-coverage-threshold 70 --summary-coverage-threshold 80 --summary-coverage-threshold 90 --summary-coverage-threshold 100 --omit-depth-output-at-each-base true --omit-interval-statistics true --omit-locus-table true --min-base-quality 20 -RF MappingQualityReadFilter --minimum-mapping-quality 20'
+        cdata['dependency'] = 'afterok:' + str(p0)
+        p1 = send_sbatch(cdata)
+        ljobids.append(p1)
+        cdata['job_name'] = pollo + '_CollectPaddedMetrics'
+        cdata['filename'] = outdir + '/' + pollo + '_CollectPaddedMetrics.sh'
+        cdata['output'] = outdir + '/' + pollo + '_CollectPaddedMetrics.out'
+        cdata['command'] = gatk + ' DepthOfCoverage -I ' + resdir + '/' + pollo + '_recal.bam -O ' + resdir + '/' + pollo + '_padded_wgs_metrics.txt  -R ' + ref_fa + ' -L ' + unions + ' --summary-coverage-threshold 10 --summary-coverage-threshold 15 --summary-coverage-threshold 20 --summary-coverage-threshold 30 --summary-coverage-threshold 40 --summary-coverage-threshold 50 --summary-coverage-threshold 60 --summary-coverage-threshold 70 --summary-coverage-threshold 80 --summary-coverage-threshold 90 --summary-coverage-threshold 100 --omit-depth-output-at-each-base true --omit-interval-statistics true --omit-locus-table true -ip 100 --min-base-quality 20 -RF MappingQualityReadFilter --minimum-mapping-quality 20'
+        cdata['dependency'] = 'afterok:' + str(p0)
+        p1 = send_sbatch(cdata)
+        ljobids.append(p1)
+        cdata['cpus'] = 8;
         # HaplotypeCaller, depende de ApplyBQSR
         cdata['job_name'] = pollo + '_HaplotypeCaller'
         cdata['filename'] = outdir + '/' + pollo + '_HaplotypeCaller.sh'
         cdata['output'] = outdir + '/' + pollo + '_HaplotypeCaller.out'
-        cdata['command'] = gatk + ' HaplotypeCaller -R '+ref_fa+' -I '+ resdir + '/' + pollo + '_recal.bam -ERC GVCF --dbsnp '+ref_dir+'/'+dbsnp+' -O '+ resdir + '/' + pollo +'_raw.snps.indels.g.vcf.gz\n'
+        cdata['command'] = gatk + ' HaplotypeCaller -R ' +ref_fa + ' -L ' + unions + ' -I '+ resdir + '/' + pollo + '_recal.bam -G StandardAnnotation -G AS_StandardAnnotation -ERC GVCF --dbsnp '+ref_dir+'/'+dbsnp+' -O '+ resdir + '/' + pollo +'_raw.snps.indels.g.vcf.gz\n'
         cdata['command'] += gatk + ' VariantEval -R '+ref_fa+' -L '+unions+' -D '+ref_dir+'/'+hcsnps+' -O '+resdir + '/' + pollo +'_eval.gatkreport --eval '+ resdir + '/' + pollo +'_raw.snps.indels.g.vcf.gz'
         cdata['dependency'] = 'afterok:' + str(p0)
         p1 = send_sbatch(cdata)
