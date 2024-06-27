@@ -106,7 +106,7 @@ if not os.path.isdir(fwdir): os.mkdir(fwdir)
 fq = {}
 jobids = []
 cdata = {'time':'24:0:0', 'cpus':'8', 'mem-per-cpu':'4G'}
-cdata['test'] = 0;
+cdata['test'] = 1;
 pollos_list = wdir+'/subjects.list'
 if os.path.exists(pollos_list):  os.remove(pollos_list)
 for pollo in dir_cont:
