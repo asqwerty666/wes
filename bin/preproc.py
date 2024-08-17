@@ -60,9 +60,10 @@ gatk = 'singularity run --cleanenv -B /nas:/nas -B /ruby:/ruby -B /the_dysk:/the
 snpEff = 'java -Xmx8g -jar /nas/software/snpEff/snpEff.jar'
 deepvariant = 'singularity run --cleanenv -B /nas:/nas -B /ruby:/ruby -B /the_dysk:/the_dysk /nas/usr/local/opt/deepvariant.simg /opt/deepvariant/bin/run_deepvariant'
 # Get CLI inputs
-short_args = 'c:o:gs:'
-long_args = ['cut=', 'output=', 'debug', 'source=']
+short_args = 'c:o:gts:'
+long_args = ['cut=', 'output=', 'debug', 'test', 'source=']
 debug = 0
+test = 0
 cfile=''
 outdatadir=''
 try:
@@ -73,13 +74,15 @@ except getopt.error as err:
 
 for a,v in args:
         if a in ('--cut', '-c'):
-                cfile = v
+            cfile = v
         elif a in ('--output', '-o'):
-                outdatadir = v
+            outdatadir = v
         elif a in ('--debug', '-g'):
-                debug = 1
+            debug = 1
+        elif a in ('--test', '-t'):
+            test = 1
         elif a in ('--source', '-s'):
-                src_dir = v
+            src_dir = v
 
 lpath = os.path.abspath(src_dir)
 dir_cont = next(os.walk(src_dir))[1]
@@ -99,6 +102,7 @@ if outdatadir:
         wdir = outdatadir
 else:
         wdir = os.environ.get('PWD') + '/output/'
+if not os.path.isdir(wdir): os.mkdir(wdir)
 outdir = wdir+'/slurm'
 if not os.path.isdir(outdir): os.mkdir(outdir)
 fwdir = wdir+'/final'
@@ -106,7 +110,7 @@ if not os.path.isdir(fwdir): os.mkdir(fwdir)
 fq = {}
 jobids = []
 cdata = {'time':'24:0:0', 'cpus':'8', 'mem-per-cpu':'4G'}
-cdata['test'] = 1;
+cdata['test'] = test;
 pollos_list = wdir+'/subjects.list'
 if os.path.exists(pollos_list):  os.remove(pollos_list)
 for pollo in dir_cont:
@@ -141,7 +145,7 @@ for pollo in dir_cont:
         cdata['job_name'] = pollo + '_CreateSam'
         cdata['output'] = outdir + '/' + pollo + '_CreateSam.out'
         cdata['command'] = bwa + ' -R "@RG\\tID:1\\tDS:KAPA_TE\\tPL:ILLUMINA\\tLB:'+pollo+'\\tSM:'+pollo+'" ' + ref_fa+' ' + lpath + '/' + pollo + '/' + pollo + '_1.fq.gz ' +  lpath + '/' + pollo + '/' + pollo + '_2.fq.gz | ' + gatk + ' SortSam -I /dev/stdin -O '+ tmpdir + '/' + pollo + '_sorted.bam --SORT_ORDER coordinate --CREATE_INDEX true\n'
-        cdata['command'] += bedtools + ' intersect -u -a ' + tmpdir + '/' + pollo + '_sorted.bam -b ' +union_bed + ' > ' + tmpdir + '/' + pollo + '_isec.bam'
+        #cdata['command'] += bedtools + ' intersect -u -a ' + tmpdir + '/' + pollo + '_sorted.bam -b ' +union_bed + ' > ' + tmpdir + '/' + pollo + '_isec.bam'
         p = send_sbatch(cdata)
         #        fjobids.append(p)
         
@@ -170,7 +174,7 @@ for pollo in dir_cont:
         cdata['job_name'] = pollo + '_MarkDuplicates'
         cdata['filename'] = outdir + '/' + pollo + '_MarkDuplicates.sh'
         cdata['output'] = outdir + '/' + pollo + '_MarkDuplicates.out'
-        cdata['command'] = gatk +  ' MarkDuplicates -I ' + tmpdir + '/' + pollo + '_isec.bam -O ' + tmpdir + '/' + pollo + '_rmdups.bam --METRICS_FILE ' + resdir + '/' + pollo + '_metrics.txt --QUIET TRUE --MAX_RECORDS_IN_RAM 2000000 --ASSUME_SORTED TRUE --CREATE_INDEX TRUE'
+        cdata['command'] = gatk +  ' MarkDuplicates -I ' + tmpdir + '/' + pollo + '_sorted.bam -O ' + tmpdir + '/' + pollo + '_rmdups.bam --METRICS_FILE ' + resdir + '/' + pollo + '_metrics.txt --QUIET TRUE --MAX_RECORDS_IN_RAM 2000000 --ASSUME_SORTED TRUE --CREATE_INDEX TRUE'
         cdata['dependency'] = 'afterok:' + str(p)
         p = send_sbatch(cdata)
         # CollectHsMetrics para sacar un report
@@ -270,7 +274,10 @@ for pollo in dir_cont:
         cdata['output'] = outdir + '/' + pollo + '_close_sbj.out'
         sdeps = 'afterok:'+',afterok:'.join(map(str,ljobids))
         cdata['dependency'] = sdeps
-        cdata['command'] = 'rm -rf '+tmpdir
+        if (debug): 
+            cdata['command'] = ':'
+        else:
+            cdata['command'] = 'rm -rf '+tmpdir
         sp = send_sbatch(cdata)
         jobids.append(sp)
 deps = 'afterok:'+',afterok:'.join(map(str,jobids))

@@ -31,8 +31,8 @@ See:
 """
 Data PATHS
 """
-#src_dir = '/nas/GRACE/seqEOAD_DEGESCO/input/DEGESCO/muestras'
-src_dir = '/nas/Genomica/01-Data/02-WXS/02-Processed/202211_WES_PSP-DEGESCO/01-gVCF/'
+src_dir = '/nas/osotolongo/wes/output'
+#src_dir = '/nas/Genomica/01-Data/02-WXS/02-Processed/202211_WES_PSP-DEGESCO/01-gVCF/'
 ref_dir = '/nas/Genomica/01-Data/00-Reference_files/02-GRCh38/00_Bundle/'
 ref_name = 'Homo_sapiens_assembly38'
 ref_fa = ref_dir+'/'+ref_name+'.fasta'
@@ -110,7 +110,8 @@ chrs.append('X')
 chrs.append('Y')
 for pollo in dir_cont:
 	with open(pollos_list, 'a') as lf:
-		lf.write(pollo + '\t'+ src_dir + '/'+ pollo +'/results/' + pollo +'_raw.snps.indels.g.vcf.gz\n')
+                fvcf = src_dir + '/'+ pollo +'/results/' + pollo +'_raw.snps.indels.g.vcf.gz'
+                if (os.path.exists(fvcf)): lf.write(pollo + '\t'+ fvcf + '\n')
 ldata = {'time':'72:0:0', 'cpus':'16', 'mem_cpu':'4G'}
 ldata['test'] = 0
 chjobids = []
